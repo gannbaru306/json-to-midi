@@ -51,30 +51,53 @@
 
 <script>
 function generateMidi() {
-  const data = JSON.parse(document.getElementById("jsonInput").value);
-  const tracks = [];
-  const ticksPerBeat = 480;
+  try {
+    const data = JSON.parse(document.getElementById("jsonInput").value);
+    const tracks = [];
+    const ticksPerBeat = 480;
 
-  data.tracks.forEach((t, index) => {
-    const track = new MidiWriter.Track();
+    data.tracks.forEach((t, index) => {
+      const track = new MidiWriter.Track();
+      if (index === 0) track.setTempo(data.tempo || 120);
 
-    // テンポは最初のトラックだけでOK
-    if (index === 0) {
-      track.setTempo(data.tempo || 120);
-    }
+      const channel = t.isDrum ? 9 : index % 16;
 
-    // チャンネル割当
-    const channel = t.isDrum ? 9 : index % 16;
+      if (!t.isDrum) {
+        track.addEvent(
+          new MidiWriter.ProgramChangeEvent({
+            instrument: t.program ?? 0,
+            channel
+          })
+        );
+      }
 
-    // 楽器指定（ドラム以外）
-    if (!t.isDrum) {
-      track.addEvent(
-        new MidiWriter.ProgramChangeEvent({
-          instrument: t.program ?? 0,
-          channel: channel
-        })
-      );
-    }
+      t.notes.forEach(n => {
+        track.addEvent(
+          new MidiWriter.NoteEvent({
+            pitch: [n.pitch],
+            startTick: Math.round(n.start * ticksPerBeat),
+            duration: "T" + Math.round(n.duration * ticksPerBeat),
+            channel
+          })
+        );
+      });
+
+      tracks.push(track);
+    });
+
+    const writer = new MidiWriter.Writer(tracks);
+    const blob = new Blob([writer.buildFile()], { type: "audio/midi" });
+
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "output.mid";
+    a.click();
+
+  } catch (e) {
+    alert("エラー:\n" + e.message);
+    console.error(e);
+  }
+}
 
     // ノート追加
     t.notes.forEach(n => {
