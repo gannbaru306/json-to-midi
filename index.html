@@ -11,7 +11,7 @@
     }
     textarea {
       width: 100%;
-      height: 300px;
+      height: 320px;
       font-family: monospace;
     }
     button {
@@ -23,21 +23,28 @@
 </head>
 <body>
 
-<h1>JSON → MIDI 変換</h1>
+<h1>JSON → MIDI（複数トラック）</h1>
 
-<p>MIDI用JSONを貼り付けてください</p>
+<p>MIDI用JSONを貼ってください</p>
 
 <textarea id="jsonInput">
 {
   "tempo": 150,
   "tracks": [
     {
-      "instrument": "lead",
+      "name": "lead",
+      "program": 81,
       "notes": [
         { "pitch": 69, "start": 0, "duration": 0.5 },
-        { "pitch": 72, "start": 0.5, "duration": 0.5 },
-        { "pitch": 74, "start": 1.0, "duration": 0.5 },
-        { "pitch": 76, "start": 1.5, "duration": 1.0 }
+        { "pitch": 72, "start": 0.5, "duration": 0.5 }
+      ]
+    },
+    {
+      "name": "bass",
+      "program": 34,
+      "notes": [
+        { "pitch": 45, "start": 0, "duration": 1.0 },
+        { "pitch": 43, "start": 1.0, "duration": 1.0 }
       ]
     }
   ]
@@ -57,22 +64,33 @@ function generateMIDI() {
     return;
   }
 
-  const track = new MidiWriter.Track();
-  track.setTempo(data.tempo || 120);
+  const tracks = [];
+  const ticksPerBeat = 128;
 
-  data.tracks.forEach(t => {
+  data.tracks.forEach((t, index) => {
+    const track = new MidiWriter.Track();
+    track.setTempo(data.tempo || 120);
+
+    if (typeof t.program === "number") {
+      track.addEvent(new MidiWriter.ProgramChangeEvent({
+        instrument: t.program
+      }));
+    }
+
     t.notes.forEach(n => {
       track.addEvent(
         new MidiWriter.NoteEvent({
           pitch: [n.pitch],
-          duration: 'T' + Math.round(n.duration * 128),
-          startTick: Math.round(n.start * 128)
+          duration: 'T' + Math.round(n.duration * ticksPerBeat),
+          startTick: Math.round(n.start * ticksPerBeat)
         })
       );
     });
+
+    tracks.push(track);
   });
 
-  const writer = new MidiWriter.Writer([track]);
+  const writer = new MidiWriter.Writer(tracks);
   const blob = new Blob([writer.buildFile()], { type: "audio/midi" });
 
   const a = document.createElement("a");
