@@ -1,88 +1,89 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>JSON to MIDI</title>
-  <script src="https://cdn.jsdelivr.net/npm/midi-writer-js@2.1.1/build/MidiWriter.min.js"></script>
+  <meta charset="UTF-8" />
+  <title>JSON → MIDI コンバーター</title>
+  <script src="https://cdn.jsdelivr.net/npm/midi-writer-js@2.1.4/build/MidiWriter.min.js"></script>
   <style>
-    body {
-      font-family: sans-serif;
-      padding: 20px;
-    }
-    textarea {
-      width: 100%;
-      height: 320px;
-      font-family: monospace;
-    }
-    button {
-      margin-top: 10px;
-      padding: 10px 20px;
-      font-size: 16px;
-    }
+    body { font-family: sans-serif; background: #111; color: #eee; }
+    textarea { width: 100%; height: 300px; background: #222; color: #0f0; }
+    button { font-size: 16px; padding: 10px; margin-top: 10px; }
   </style>
 </head>
 <body>
 
-<h1>JSON → MIDI（複数トラック）</h1>
+<h1>JSON → MIDI</h1>
 
-<p>MIDI用JSONを貼ってください</p>
+<p>複数トラック / 楽器反映 / ドラム対応</p>
 
 <textarea id="jsonInput">
 {
   "tempo": 150,
   "tracks": [
     {
-      "name": "lead",
+      "name": "melody",
       "program": 81,
       "notes": [
-        { "pitch": 69, "start": 0, "duration": 0.5 },
-        { "pitch": 72, "start": 0.5, "duration": 0.5 }
+        { "pitch": 76, "start": 0, "duration": 1 },
+        { "pitch": 79, "start": 1, "duration": 1 }
       ]
     },
     {
       "name": "bass",
-      "program": 34,
+      "program": 33,
       "notes": [
-        { "pitch": 45, "start": 0, "duration": 1.0 },
-        { "pitch": 43, "start": 1.0, "duration": 1.0 }
+        { "pitch": 45, "start": 0, "duration": 2 }
+      ]
+    },
+    {
+      "name": "drums",
+      "isDrum": true,
+      "notes": [
+        { "pitch": 36, "start": 0, "duration": 0.25 },
+        { "pitch": 38, "start": 0.5, "duration": 0.25 }
       ]
     }
   ]
 }
 </textarea>
 
-<br>
-<button onclick="generateMIDI()">MIDIを生成してダウンロード</button>
+<button onclick="generateMidi()">MIDIを生成</button>
 
 <script>
-function generateMIDI() {
-  let data;
-  try {
-    data = JSON.parse(document.getElementById("jsonInput").value);
-  } catch {
-    alert("JSONが壊れています");
-    return;
-  }
-
+function generateMidi() {
+  const data = JSON.parse(document.getElementById("jsonInput").value);
   const tracks = [];
-  const ticksPerBeat = 128;
+  const ticksPerBeat = 480;
 
   data.tracks.forEach((t, index) => {
     const track = new MidiWriter.Track();
-    track.setTempo(data.tempo || 120);
 
-    if (typeof t.program === "number") {
-      track.addEvent(new MidiWriter.ProgramChangeEvent({
-        instrument: t.program
-      }));
+    // テンポは最初のトラックだけでOK
+    if (index === 0) {
+      track.setTempo(data.tempo || 120);
     }
 
+    // チャンネル割当
+    const channel = t.isDrum ? 9 : index % 16;
+
+    // 楽器指定（ドラム以外）
+    if (!t.isDrum) {
+      track.addEvent(
+        new MidiWriter.ProgramChangeEvent({
+          instrument: t.program ?? 0,
+          channel: channel
+        })
+      );
+    }
+
+    // ノート追加
     t.notes.forEach(n => {
       track.addEvent(
         new MidiWriter.NoteEvent({
           pitch: [n.pitch],
-          duration: 'T' + Math.round(n.duration * ticksPerBeat),
-          startTick: Math.round(n.start * ticksPerBeat)
+          startTick: Math.round(n.start * ticksPerBeat),
+          duration: "T" + Math.round(n.duration * ticksPerBeat),
+          channel: channel
         })
       );
     });
@@ -95,7 +96,7 @@ function generateMIDI() {
 
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "music.mid";
+  a.download = "output.mid";
   a.click();
 }
 </script>
