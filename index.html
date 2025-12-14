@@ -99,6 +99,20 @@ function generateMidi() {
   }
 }
 
+    const writer = new MidiWriter.Writer(tracks);
+    const blob = new Blob([writer.buildFile()], { type: "audio/midi" });
+
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "output.mid";
+    a.click();
+
+  } catch (e) {
+    alert("エラー:\n" + e.message);
+    console.error(e);
+  }
+}
+
     // ノート追加
     t.notes.forEach(n => {
       track.addEvent(
